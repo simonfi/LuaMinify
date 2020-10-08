@@ -7,10 +7,11 @@
 -- all whitespace formatting information.
 -- ParseLua returns an AST, internally relying on LexLua.
 --
+local luaPath = debug.getinfo(1).source:match("@?(.*/)")
 
-require'strict'
+require(luaPath..'strict')
 
-local util = require'Util'
+local util = require(luaPath..'Util')
 local lookupify = util.lookupify
 
 local WhiteChars = lookupify{' ', '\n', '\t', '\r'}
@@ -26,7 +27,7 @@ local HexDigits = lookupify{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 							'A', 'a', 'B', 'b', 'C', 'c', 'D', 'd', 'E', 'e', 'F', 'f'}
 
 local Symbols = lookupify{'+', '-', '*', '/', '^', '%', ',', '{', '}', '[', ']', '(', ')', ';', '#', '&'}
-local Scope = require'Scope'
+local Scope = require(luaPath..'Scope')
 
 local Keywords = lookupify{
 	'and', 'break', 'do', 'else', 'elseif',

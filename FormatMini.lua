@@ -1,7 +1,9 @@
 
-local parser = require'ParseLua'
+local luaPath = debug.getinfo(1).source:match("@?(.*/)")
+
+local parser = require(luaPath..'ParseLua')
 local ParseLua = parser.ParseLua
-local util = require'Util'
+local util = require(luaPath..'Util')
 local lookupify = util.lookupify
 
 --
