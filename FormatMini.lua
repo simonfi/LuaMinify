@@ -19,18 +19,13 @@ local UpperChars = lookupify{'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I',
 							 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 
 							 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'}
 local Digits = lookupify{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
-local Symbols = lookupify{'+', '-', '*', '/', '^', '%', ',', '{', '}', '[', ']', '(', ')', ';', '#'}
+local Symbols = lookupify{'+', '-', '*', '/', '^', '%', ',', '{', '}', '[', ']', '(', ')', ';', '#', '&'}
 
 local function Format_Mini(ast)
 	local formatStatlist, formatExpr;
 	local count = 0
 	--
 	local function joinStatementsSafe(a, b, sep)
-	--print(a, b)
-		if count > 150 then
-			count = 0
-			return a.."\n"..b
-		end
 		sep = sep or ' '
 		local aa, bb = a:sub(-1,-1), b:sub(1,1)
 		if UpperChars[aa] or LowerChars[aa] or aa == '_' then
@@ -207,6 +202,23 @@ local function Format_Mini(ast)
 				end
 			end
 
+		elseif statement.AstType == 'CompoundAssignmentStatement' then
+			for i = 1, #statement.Lhs do
+				out = out..formatExpr(statement.Lhs[i])
+				if i ~= #statement.Lhs then
+					out = out..","
+				end
+			end
+			if #statement.Rhs > 0 then
+				out = out..statement.CompoundType.."="
+				for i = 1, #statement.Rhs do
+					out = out..formatExpr(statement.Rhs[i])
+					if i ~= #statement.Rhs then
+						out = out..","
+					end
+				end
+			end
+
 		elseif statement.AstType == 'CallStatement' then
 			out = formatExpr(statement.Expression)
 
@@ -227,23 +239,34 @@ local function Format_Mini(ast)
 					end
 				end
 			end
+			out = out .. "\n"
 
 		elseif statement.AstType == 'IfStatement' then
 			out = joinStatementsSafe("if", formatExpr(statement.Clauses[1].Condition))
-			out = joinStatementsSafe(out, "then")
-			out = joinStatementsSafe(out, formatStatlist(statement.Clauses[1].Body))
+
+			if (not statement.SimpleIf) then
+				out = joinStatementsSafe(out, "then", "\n")
+			end
+
+			out = joinStatementsSafe(out, formatStatlist(statement.Clauses[1].Body), "\n")
+
 			for i = 2, #statement.Clauses do
 				local st = statement.Clauses[i]
 				if st.Condition then
-					out = joinStatementsSafe(out, "elseif")
-					out = joinStatementsSafe(out, formatExpr(st.Condition))
-					out = joinStatementsSafe(out, "then")
+					out = joinStatementsSafe(out, "elseif", "\n")
+					out = joinStatementsSafe(out, formatExpr(st.Condition), "\n")
+					out = joinStatementsSafe(out, "then", "\n")
 				else
-					out = joinStatementsSafe(out, "else")
+					out = joinStatementsSafe(out, "else", "\n")
 				end
 				out = joinStatementsSafe(out, formatStatlist(st.Body))
 			end
-			out = joinStatementsSafe(out, "end")
+
+			if (not statement.SimpleIf) then
+				out = joinStatementsSafe(out, "end", "\n")
+			else
+				out = out .. "\n"
+			end
 
 		elseif statement.AstType == 'WhileStatement' then
 			out = joinStatementsSafe("while", formatExpr(statement.Condition))
@@ -335,9 +358,9 @@ local function Format_Mini(ast)
 			out = joinStatementsSafe(out, formatStatlist(statement.Body))
 			out = joinStatementsSafe(out, "end")
 		elseif statement.AstType == 'LabelStatement' then
-			out = getIndentation() .. "::" .. statement.Label .. "::"
+			out = "::" .. statement.Label .. "::"
 		elseif statement.AstType == 'GotoStatement' then
-			out = getIndentation() .. "goto " .. statement.Label
+			out = "goto " .. statement.Label
 		elseif statement.AstType == 'Comment' then
 			-- ignore
 		elseif statement.AstType == 'Eof' then
@@ -353,7 +376,7 @@ local function Format_Mini(ast)
 		local out = ''
 		statList.Scope:ObfuscateVariables()
 		for _, stat in pairs(statList.Body) do
-			out = joinStatementsSafe(out, formatStatement(stat), ';')
+			out = joinStatementsSafe(out, formatStatement(stat), '\n')
 		end
 		return out
 	end

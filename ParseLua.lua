@@ -25,7 +25,7 @@ local Digits = lookupify{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
 local HexDigits = lookupify{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 							'A', 'a', 'B', 'b', 'C', 'c', 'D', 'd', 'E', 'e', 'F', 'f'}
 
-local Symbols = lookupify{'+', '-', '*', '/', '^', '%', ',', '{', '}', '[', ']', '(', ')', ';', '#'}
+local Symbols = lookupify{'+', '-', '*', '/', '^', '%', ',', '{', '}', '[', ']', '(', ')', ';', '#', '&'}
 local Scope = require'Scope'
 
 local Keywords = lookupify{
@@ -322,6 +322,10 @@ local function LexLua(src)
 			elseif consume('>=<') then
 				if consume('=') then
 					toEmit = {Type = 'Symbol', Data = c..'='}
+				elseif consume('<') then
+					toEmit = {Type = 'Symbol', Data = '<<'}
+				elseif consume('>') then
+					toEmit = {Type = 'Symbol', Data = '>>'}
 				else
 					toEmit = {Type = 'Symbol', Data = c}
 				end
@@ -596,6 +600,7 @@ local function ParseLua(src)
 
 	local ParseExpr
 	local ParseStatementList
+	local ParseSingleStatementList
 	local ParseSimpleExpr, 
 			ParseSubExpr,
 			ParsePrimaryExpr,
@@ -928,6 +933,9 @@ local function ParseLua(src)
 	local unops = lookupify{'-', 'not', '#'}
 	local unopprio = 8
 	local priority = {
+		['>>'] = {6,6};
+		['<<'] = {6,6};
+		['&'] = {6,6};
 		['+'] = {6,6};
 		['-'] = {6,6};
 		['%'] = {7,7};
@@ -1008,11 +1016,20 @@ local function ParseLua(src)
 			repeat
 				local st, nodeCond = ParseExpr(scope)
 				if not st then return false, nodeCond end
+
+    		local st, nodeBody = nil, nil
+
 				if not tok:ConsumeKeyword('then', tokenList) then
-					return false, GenerateError("`then` expected.")
+				  st, nodeBody = ParseSingleStatementList(scope)
+				  if not st then return false, nodeBody end
+          nodeIfStat.SimpleIf = true
+        else
+				  st, nodeBody = ParseStatementList(scope)
+				  if not st then return false, nodeBody end
+          nodeIfStat.SimpleIf = false
 				end
-				local st, nodeBody = ParseStatementList(scope)
-				if not st then return false, nodeBody end
+
+
 				nodeIfStat.Clauses[#nodeIfStat.Clauses+1] = {
 					Condition = nodeCond;
 					Body = nodeBody;
@@ -1029,7 +1046,7 @@ local function ParseLua(src)
 			end
 
 			--end
-			if not tok:ConsumeKeyword('end', tokenList) then
+			if not nodeIfStat.SimpleIf and not tok:ConsumeKeyword('end', tokenList) then
 				return false, GenerateError("`end` expected.")
 			end
 
@@ -1306,11 +1323,23 @@ local function ParseLua(src)
 			if not st then return false, suffixed end
 
 			--assignment or call?
-			if tok:IsSymbol(',') or tok:IsSymbol('=') then
+			if tok:IsSymbol(',') or tok:IsSymbol('=') or tok:IsSymbol('+') or tok:IsSymbol('*') or tok:IsSymbol('/') or tok:IsSymbol('-') then
+				local nodeAssign = {}
+				nodeAssign.AstType = 'AssignmentStatement'
+
 				--check that it was not parenthesized, making it not an lvalue
 				if (suffixed.ParenCount or 0) > 0 then
 					return false, GenerateError("Can not assign to parenthesized expression, is not an lvalue")
 				end
+
+        --end operations
+        local compoundOperator = tok:Peek()
+        if tok:ConsumeSymbol('+') or tok:ConsumeSymbol('-') or tok:ConsumeSymbol('*') or tok:ConsumeSymbol('/')then
+          if tok:IsSymbol('=') then
+				    nodeAssign.AstType = 'CompoundAssignmentStatement'
+            nodeAssign.CompoundType = compoundOperator.Data
+          end
+        end
 
 				--more processing needed
 				local lhs = { suffixed }
@@ -1337,8 +1366,6 @@ local function ParseLua(src)
 				end
 
 				--done
-				local nodeAssign = {}
-				nodeAssign.AstType = 'AssignmentStatement'
 				nodeAssign.Lhs     = lhs
 				nodeAssign.Rhs     = rhs
 				nodeAssign.Tokens  = tokenList
@@ -1383,6 +1410,32 @@ local function ParseLua(src)
 			--stats[#stats+1] = nodeStatement
 			nodeStatlist.Body[#nodeStatlist.Body + 1] = nodeStatement
 		end
+
+		if tok:IsEof() then
+			local nodeEof = {}
+			nodeEof.AstType = 'Eof'
+			nodeEof.Tokens  = { tok:Get() }
+			nodeStatlist.Body[#nodeStatlist.Body + 1] = nodeEof
+		end
+
+		--
+		--nodeStatlist.Body = stats
+		return true, nodeStatlist
+	end
+
+	ParseSingleStatementList = function(scope)
+		local nodeStatlist   = {}
+		nodeStatlist.Scope   = CreateScope(scope)
+		nodeStatlist.AstType = 'Statlist'
+		nodeStatlist.Body    = { }
+		nodeStatlist.Tokens  = { }
+		--
+		--local stats = {}
+		--
+		local st, nodeStatement = ParseStatement(nodeStatlist.Scope)
+		if not st then return false, nodeStatement end
+		--stats[#stats+1] = nodeStatement
+    nodeStatlist.Body[#nodeStatlist.Body + 1] = nodeStatement
 
 		if tok:IsEof() then
 			local nodeEof = {}
