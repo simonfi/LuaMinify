@@ -23,8 +23,8 @@ local UpperChars = lookupify{'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I',
 							 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R',
 							 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'}
 local Digits = lookupify{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
-local HexDigits = lookupify{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-							'A', 'a', 'B', 'b', 'C', 'c', 'D', 'd', 'E', 'e', 'F', 'f'}
+local HexDigits = lookupify{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'a', 'B', 'b', 'C', 'c', 'D', 'd', 'E', 'e', 'F', 'f'}
+local BinDigits = lookupify{'0', '1'}
 
 local Symbols = lookupify{'+', '-', '*', '/', '^', '%', ',', '{', '}', '[', ']', '(', ')', ';', '#', '&'}
 local Scope = require(luaPath..'Scope')
@@ -276,6 +276,13 @@ local function LexLua(src)
 				if c == '0' and peek(1) == 'x' then
 					get();get()
 					while HexDigits[peek()] do get() end
+					if consume('Pp') then
+						consume('+-')
+						while Digits[peek()] do get() end
+					end
+				elseif c == '0' and peek(1) == 'b' then
+					get();get()
+					while BinDigits[peek()] do get() end
 					if consume('Pp') then
 						consume('+-')
 						while Digits[peek()] do get() end
