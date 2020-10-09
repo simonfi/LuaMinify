@@ -244,7 +244,7 @@ local function Format_Mini(ast)
 			out = out .. "\n"
 
 		elseif statement.AstType == 'IfStatement' then
-			out = joinStatementsSafe("if", formatExpr(statement.Clauses[1].Condition))
+			out = joinStatementsSafe("\nif", formatExpr(statement.Clauses[1].Condition))
 
 			if (not statement.SimpleIf) then
 				out = joinStatementsSafe(out, "then", "\n")
