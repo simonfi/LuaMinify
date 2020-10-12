@@ -26,7 +26,7 @@ local Digits = lookupify{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
 local HexDigits = lookupify{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'a', 'B', 'b', 'C', 'c', 'D', 'd', 'E', 'e', 'F', 'f'}
 local BinDigits = lookupify{'0', '1'}
 
-local Symbols = lookupify{'+', '-', '*', '/', '^', '%', ',', '{', '}', '[', ']', '(', ')', ';', '#', '&'}
+local Symbols = lookupify{'+', '-', '*', '/', '^', '%', ',', '{', '}', '[', ']', '(', ')', ';', '#', '&', '|'}
 local Scope = require(luaPath..'Scope')
 
 local Keywords = lookupify{
@@ -943,6 +943,7 @@ local function ParseLua(src)
 	local priority = {
 		['>>'] = {6,6};
 		['<<'] = {6,6};
+		['|'] = {6,6};
 		['&'] = {6,6};
 		['+'] = {6,6};
 		['-'] = {6,6};
